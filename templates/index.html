@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Balanceador de Times</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .player-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .player-card {
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        .rating-elite { color: #2ecc71; }
+        .rating-good { color: #3498db; }
+        .rating-regular { color: #f1c40f; }
+        .rating-beginner { color: #e74c3c; }
+        .button-group {
+            margin: 10px 0;
+            display: flex;
+            gap: 10px;
+        }
+        .import-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        textarea {
+            width: 100%;
+            min-height: 100px;
+            margin: 10px 0;
+        }
+        button {
+            padding: 8px 16px;
+            cursor: pointer;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            background-color: #f8f9fa;
+        }
+        button:hover {
+            background-color: #e9ecef;
+        }
+    </style>
+</head>
+<body>
+    <h1>Balanceador de Times</h1>
+
+    <form action="{{ url_for('balance') }}" method="post" id="balanceForm">
+        <div class="controls">
+            <label for="num_teams">Número de Times:</label>
+            <select name="num_teams" id="num_teams">
+                <option value="2">2 Times</option>
+                <option value="3">3 Times</option>
+                <option value="4" selected>4 Times</option>
+            </select>
+        </div>
+
+        <div class="button-group">
+            <button type="button" onclick="selectAllPlayers()">Selecionar Todos</button>
+            <button type="button" onclick="deselectAllPlayers()">Limpar Seleção</button>
+            <button type="button" onclick="toggleImportSection()">Importar Jogadores</button>
+        </div>
+
+        <div id="importSection" class="import-section" style="display: none;">
+            <h3>Importar Lista de Jogadores</h3>
+            <p>Cole a lista de jogadores no formato: Nome, Posição, Nível</p>
+            <p>Exemplo:<br>João, GOL, 8<br>Maria, ZAG, 7<br>Pedro, ATA, 9</p>
+            <textarea id="playerImport" placeholder="Cole sua lista aqui..."></textarea>
+            <button type="button" onclick="importPlayers()">Processar Lista</button>
+        </div>
+
+        <h2>Selecione os Jogadores:</h2>
+        <div class="player-list">
+            {% for player in players %}
+            <div class="player-card">
+                <input type="checkbox" 
+                       name="player_{{ player.name }}" 
+                       id="player_{{ player.name }}" 
+                       value="1">
+                <label for="player_{{ player.name }}">
+                    {{ player.name }}
+                    <span class="rating-{{ player.category.value }}">
+                        ({{ player.overall_rating }})
+                    </span>
+                    <br>
+                    <small>{{ player.position.value }}</small>
+                </label>
+            </div>
+            {% endfor %}
+        </div>
+
+        <button type="submit">Balancear Times</button>
+    </form>
+
+    <script>
+        function selectAllPlayers() {
+            document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+                checkbox.checked = true;
+            });
+        }
+
+        function deselectAllPlayers() {
+            document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+        }
+
+        function toggleImportSection() {
+            const importSection = document.getElementById('importSection');
+            importSection.style.display = importSection.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function importPlayers() {
+            const textarea = document.getElementById('playerImport');
+            const lines = textarea.value.trim().split('\n');
+
+            // Primeiro, desmarca todos os jogadores
+            deselectAllPlayers();
+
+            // Processa cada linha
+            lines.forEach(line => {
+                const [name, position, level] = line.split(',').map(item => item.trim());
+                // Procura por checkbox que contenha o nome do jogador
+                const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+                checkboxes.forEach(checkbox => {
+                    if (checkbox.id.toLowerCase().includes(name.toLowerCase())) {
+                        checkbox.checked = true;
+                    }
+                });
+            });
+        }
+    </script>
+</body>
+</html>
