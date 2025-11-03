@@ -33,23 +33,23 @@ class Player:
 
 # Lista real de jogadores com intensidade (adicionada aleatoriamente para manter o exemplo)
 real_players = [
-    Player("AlLyson", 4, Intensity.HIGH, mensalista=True),
-    Player("Cyrillo", 3, Intensity.LOW, mensalista=True),
+    Player("Ivo", 4, Intensity.HIGH, mensalista=True),
+    Player("Vaca", 3, Intensity.LOW, mensalista=True),
     Player("Caio", 1, Intensity.LOW, mensalista=True),
     Player("Calafa", 4, Intensity.LOW, mensalista=True),
     Player("Daniel", 2, Intensity.LOW, mensalista=True),
     Player("Down", 2, Intensity.LOW, mensalista=True),
     Player("Gabriel de Leon", 2, Intensity.HIGH, mensalista=True),
     Player("Guilherme Figueiredo", 5, Intensity.HIGH, mensalista=True),
-    Player("Guila", 5, Intensity.LOW, mensalista=False),
+    Player("Guila", 4, Intensity.LOW, mensalista=False),
     Player("Hugo", 4, Intensity.HIGH, mensalista=True),
     Player("Falcão", 4, Intensity.HIGH, mensalista=True),
-    Player("Lucas Souza", 3, Intensity.LOW, mensalista=True),
+    Player("Lucas Souza", 4, Intensity.LOW, mensalista=True),
     Player("Luquinhas", 6, Intensity.HIGH, mensalista=True),
     Player("Nego", 5, Intensity.HIGH, mensalista=True),
     Player("Pato", 3, Intensity.LOW, mensalista=True),
     Player("Paulo Freitas", 1, Intensity.LOW, mensalista=True),
-    Player("Dudu", 6, Intensity.LOW, mensalista=True),
+    Player("Arthur Melo", 3, Intensity.LOW, mensalista=True),
     Player("Sammy", 3, Intensity.HIGH, mensalista=True),
     Player("Serginho", 6, Intensity.LOW, mensalista=True),
     Player("SHEIK", 1, Intensity.LOW, mensalista=True),
@@ -58,7 +58,7 @@ real_players = [
     Player("PA", 7, Intensity.HIGH, mensalista=False),
     Player("Antônio", 2, Intensity.LOW, mensalista=False),
     Player("Dias", 2, Intensity.LOW, mensalista=False),
-    Player("Diego", 3, Intensity.HIGH, mensalista=False),
+    Player("Girão", 3, Intensity.HIGH, mensalista=False),
     Player("Diogo", 6, Intensity.HIGH, mensalista=False),
     Player("Diego Spencer", 3, Intensity.LOW, mensalista=False),
     
@@ -72,11 +72,11 @@ real_players = [
     Player("Jonas", 4, Intensity.LOW, mensalista=False),
     Player("PAJÉ", 6, Intensity.HIGH, mensalista=False),
     Player("Gustavo", 4, Intensity.LOW, mensalista=False),
-    Player("Porpino", 4, Intensity.HIGH, mensalista=False),
+    Player("Sabugo", 3, Intensity.LOW, mensalista=False),
     Player("Junior", 4, Intensity.LOW, mensalista=False),
     Player("Marcelo Torres", 5, Intensity.LOW, mensalista=False),
     Player("Eduardo Jorge", 4, Intensity.LOW, mensalista=False),
-    Player("Vaca", 3, Intensity.LOW, mensalista=False)
+    Player("Vareta", 2, Intensity.LOW, mensalista=False)
 
 ]
 
