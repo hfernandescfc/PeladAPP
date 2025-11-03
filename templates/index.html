@@ -61,6 +61,37 @@
     <h1>Balanceador de Times</h1>
 
     <form action="{{ url_for('balance') }}" method="post" id="balanceForm">
+        <div class="import-section">
+            <h3>Adicionar Jogador</h3>
+            <div style="display:grid; grid-template-columns: 1fr 120px 160px 140px; gap: 8px; align-items:end;">
+                <div>
+                    <label>Nome<br>
+                        <input type="text" id="new_name" placeholder="Ex.: João" />
+                    </label>
+                </div>
+                <div>
+                    <label>Avaliação<br>
+                        <input type="number" id="new_rating" step="0.1" min="0" max="10" placeholder="4.0" />
+                    </label>
+                </div>
+                <div>
+                    <label>Intensidade<br>
+                        <select id="new_intensity">
+                            <option value="HIGH">HIGH</option>
+                            <option value="LOW">LOW</option>
+                        </select>
+                    </label>
+                </div>
+                <div>
+                    <label>
+                        <input type="checkbox" id="new_mensalista" /> Mensalista
+                    </label>
+                </div>
+            </div>
+            <div style="margin-top:10px;">
+                <button type="button" onclick="addPlayer()">Adicionar</button>
+            </div>
+        </div>
         <div class="controls">
             <label for="num_teams">Número de Times:</label>
             <select name="num_teams" id="num_teams">
@@ -93,7 +124,10 @@
                        name="player_{{ player.name }}" 
                        id="player_{{ player.name }}" 
                        value="1"
-                       data-mensalista="{{ 'true' if player.mensalista else 'false' }}">
+                       data-mensalista="{{ 'true' if player.mensalista else 'false' }}"
+                       data-name="{{ player.name }}"
+                       data-rating="{{ player.overall_rating }}"
+                       data-intensity="{{ player.intensity.name }}">
                 <label for="player_{{ player.name }}">
                     {{ player.name }}
                     <span class="rating-{{ player.category.value }}">
@@ -102,6 +136,10 @@
                     <br>
                     <small>{{ player.intensity.value }}</small>
                 </label>
+                <div class="button-group">
+                    <button type="button" onclick="editPlayer(this)">Editar</button>
+                    <button type="button" onclick="deletePlayer(this)">Excluir</button>
+                </div>
             </div>
             {% endfor %}
         </div>
@@ -151,6 +189,87 @@
                     }
                 });
             });
+        }
+
+        async function addPlayer() {
+            const name = document.getElementById('new_name').value.trim();
+            const rating = document.getElementById('new_rating').value;
+            const intensity = document.getElementById('new_intensity').value;
+            const mensalista = document.getElementById('new_mensalista').checked;
+
+            if (!name || rating === '') {
+                alert('Preencha nome e avaliação.');
+                return;
+            }
+
+            try {
+                const res = await fetch('{{ url_for('add_players') }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        players: [{ name, rating, intensity, mensalista }]
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Erro ao adicionar');
+                location.reload();
+            } catch (e) {
+                alert(e.message);
+            }
+        }
+
+        async function editPlayer(btn) {
+            const card = btn.closest('.player-card');
+            const checkbox = card.querySelector('input[type="checkbox"]');
+            const oldName = checkbox.dataset.name;
+            const currentRating = checkbox.dataset.rating;
+            const currentIntensity = checkbox.dataset.intensity || 'HIGH';
+            const currentMensalista = checkbox.dataset.mensalista === 'true';
+
+            const name = prompt('Nome:', oldName);
+            if (name === null) return;
+            const rating = prompt('Avaliação (0-10):', currentRating);
+            if (rating === null) return;
+            const intensity = prompt('Intensidade (HIGH/LOW):', currentIntensity).toUpperCase();
+            if (intensity !== 'HIGH' && intensity !== 'LOW') {
+                alert('Intensidade deve ser HIGH ou LOW');
+                return;
+            }
+            const mensalistaStr = prompt('Mensalista? (s/n):', currentMensalista ? 's' : 'n');
+            const mensalista = (mensalistaStr || '').toLowerCase().startsWith('s');
+
+            try {
+                const res = await fetch('{{ url_for('update_player') }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ old_name: oldName, name, rating, intensity, mensalista })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Erro ao atualizar');
+                location.reload();
+            } catch (e) {
+                alert(e.message);
+            }
+        }
+
+        async function deletePlayer(btn) {
+            const card = btn.closest('.player-card');
+            const checkbox = card.querySelector('input[type="checkbox"]');
+            const name = checkbox.dataset.name;
+            if (!confirm(`Excluir jogador "${name}"?`)) return;
+
+            try {
+                const res = await fetch('{{ url_for('delete_player') }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Erro ao excluir');
+                location.reload();
+            } catch (e) {
+                alert(e.message);
+            }
         }
     </script>
 </body>

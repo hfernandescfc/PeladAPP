@@ -81,6 +81,54 @@ def add_players():
         return jsonify({'error': str(e)}), 400
 
 
+@app.route('/update_player', methods=['POST'])
+def update_player():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Requisição inválida'}), 400
+
+        old_name = data.get('old_name') or data.get('name')
+        name = data.get('name')
+        rating = data.get('rating')
+        intensity_key = data.get('intensity')
+        mensalista = bool(data.get('mensalista', False))
+
+        target = next((p for p in real_players if p.name == old_name), None)
+        if not target:
+            return jsonify({'error': 'Jogador não encontrado'}), 404
+
+        if name:
+            target.name = name
+        if rating is not None:
+            target.overall_rating = float(rating)
+        if intensity_key:
+            target.intensity = Intensity[intensity_key.upper()]
+        target.mensalista = mensalista
+
+        return jsonify({'message': 'Jogador atualizado com sucesso'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+
+@app.route('/delete_player', methods=['POST'])
+def delete_player():
+    try:
+        data = request.get_json()
+        if not data or 'name' not in data:
+            return jsonify({'error': 'Nome do jogador é obrigatório'}), 400
+
+        name = data['name']
+        idx = next((i for i, p in enumerate(real_players) if p.name == name), None)
+        if idx is None:
+            return jsonify({'error': 'Jogador não encontrado'}), 404
+
+        real_players.pop(idx)
+        return jsonify({'message': 'Jogador removido com sucesso'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port, debug=True)
