@@ -13,10 +13,10 @@
             background-color: #f5f5f5;
         }
         .header {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            margin-bottom: 20px;
+            background-color: #2c3e50;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
         }
         .header img {
             width: 50px;
@@ -33,13 +33,11 @@
             margin: 20px 0;
         }
         .team-card {
-            background-color: white;
-            border-radius: 8px;
-            padding: 15px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
         }
         .team-header {
-            color: white;
+            color: yellow;
             padding: 10px;
             border-radius: 4px;
             margin-bottom: 10px;
@@ -90,36 +88,48 @@
         }
         .primary-button {
             background-color: #1a73e8;
-            color: white;
         }
         .secondary-button {
-            background-color: #34a853;
-            color: white;
+            background-color: #e63946;
         }
         .button:hover {
             opacity: 0.9;
         }
+        /* Atualização das classes de rating para refletir as categorias */
         .rating-elite { color: #2ecc71; }
-        .rating-good { color: #3498db; }
+        .rating-bom { color: #3498db; }
         .rating-regular { color: #f1c40f; }
-        .rating-beginner { color: #e74c3c; }
+        .rating-iniciante { color: #e74c3c; }
 
         /* Cores para os times */
-        .team-blue { background-color: #1a73e8; }
-        .team-red { background-color: #ea4335; }
-        .team-green { background-color: #34a853; }
-        .team-black { background-color: #000000; }
+        .team-blue { 
+            background-color: #1a73e8;
+            color: white;
+        }
+        .team-red { 
+            background-color: #e63946;
+            color: white;
+        }
+        .team-white { 
+            background-color: #ffffff;
+            color: #2c3e50;
+            border: 1px solid #ddd;
+        }
+        .team-black { 
+            background-color: #000000;
+            color: white;
+        }
     </style>
 </head>
 <body>
     <div class="header">
-        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+        <img src="{{ url_for('static', filename='logo.jpeg') }}" alt="Logo">
         <h1>Times Balanceados</h1>
     </div>
 
     <div class="teams-container">
-        {% set team_colors = ['blue', 'red', 'green', 'black'] %}
-        {% set team_names = ['Azul', 'Vermelho', 'Verde', 'preto'] %}
+        {% set team_colors = ['blue', 'red', 'white', 'black'] %}
+        {% set team_names = ['Azul', 'Vermelho', 'Branco', 'Preto'] %}
         {% for team in teams %}
         <div class="team-card">
             <div class="team-header team-{{ team_colors[loop.index0] }}">
@@ -131,9 +141,11 @@
             {% for player in team.players %}
             <div class="player-item">
                 <strong>{{ player.name }}</strong>
-                <span class="rating-{{ player.category.value }}">({{ player.overall_rating }})</span>
+                <span class="rating-{{ player.category.value }}">
+                    ({{ player.overall_rating }})
+                </span>
                 <br>
-                <small>{{ player.position.value }}</small>
+                <small>{{ player.intensity.value }}</small>
             </div>
             {% endfor %}
             <div class="team-strength">
@@ -141,6 +153,19 @@
             </div>
         </div>
         {% endfor %}
+    </div>
+
+    <!-- Seção de compartilhamento para WhatsApp -->
+    <div class="team-card" style="margin-top: 20px; padding: 12px;">
+        <h3 style="margin-top:0;">Texto para WhatsApp</h3>
+        <textarea id="whatsappText" readonly style="width:100%; min-height: 160px; padding: 8px;">
+{{ whatsapp_text }}
+        </textarea>
+        <div class="buttons-container">
+            <button class="button primary-button" type="button" onclick="copyWhatsappText()">Copiar texto</button>
+            <button class="button secondary-button" type="button" onclick="openWhatsApp()">Abrir WhatsApp</button>
+        </div>
+        <div id="copyStatus" style="text-align:center; color:#2c3e50; display:none;">Copiado!</div>
     </div>
 
     <div class="buttons-container">
@@ -162,19 +187,37 @@
             document.getElementById('reshuffleForm').submit();
         }
 
-        // Adiciona localStorage para salvar os scores
+        // Salva os scores dos times no localStorage
         document.querySelectorAll('.score-input').forEach((input, index) => {
-            // Carrega score salvo anteriormente (se existir)
             const savedScore = localStorage.getItem(`team${index}_score`);
             if (savedScore) {
                 input.value = savedScore;
             }
-
-            // Salva score quando alterado
             input.addEventListener('change', (e) => {
                 localStorage.setItem(`team${index}_score`, e.target.value);
             });
         });
+
+        function copyWhatsappText() {
+            const ta = document.getElementById('whatsappText');
+            ta.select();
+            ta.setSelectionRange(0, 99999);
+            const ok = navigator.clipboard ?
+                navigator.clipboard.writeText(ta.value).then(() => true).catch(() => false) :
+                document.execCommand('copy');
+
+            Promise.resolve(ok).finally(() => {
+                const msg = document.getElementById('copyStatus');
+                msg.style.display = 'block';
+                setTimeout(() => { msg.style.display = 'none'; }, 1500);
+            });
+        }
+
+        function openWhatsApp() {
+            const text = document.getElementById('whatsappText').value;
+            const url = 'https://wa.me/?text=' + encodeURIComponent(text);
+            window.open(url, '_blank');
+        }
     </script>
 </body>
 </html>

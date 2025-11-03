@@ -26,9 +26,9 @@
             margin: 20px 0;
         }
         .rating-elite { color: #2ecc71; }
-        .rating-good { color: #3498db; }
+        .rating-bom { color: #3498db; }
         .rating-regular { color: #f1c40f; }
-        .rating-beginner { color: #e74c3c; }
+        .rating-iniciante { color: #e74c3c; }
         .button-group {
             margin: 10px 0;
             display: flex;
@@ -72,14 +72,15 @@
 
         <div class="button-group">
             <button type="button" onclick="selectAllPlayers()">Selecionar Todos</button>
+            <button type="button" onclick="selectMensalistas()">Selecionar Mensalistas</button>
             <button type="button" onclick="deselectAllPlayers()">Limpar Seleção</button>
             <button type="button" onclick="toggleImportSection()">Importar Jogadores</button>
         </div>
 
         <div id="importSection" class="import-section" style="display: none;">
             <h3>Importar Lista de Jogadores</h3>
-            <p>Cole a lista de jogadores no formato: Nome, Posição, Nível</p>
-            <p>Exemplo:<br>João, GOL, 8<br>Maria, ZAG, 7<br>Pedro, ATA, 9</p>
+            <p>Cole a lista de jogadores no formato: Nome, Intensidade, Avaliação</p>
+            <p>Exemplo:<br>João, HIGH, 8<br>Maria, LOW, 7<br>Pedro, HIGH, 9</p>
             <textarea id="playerImport" placeholder="Cole sua lista aqui..."></textarea>
             <button type="button" onclick="importPlayers()">Processar Lista</button>
         </div>
@@ -91,14 +92,15 @@
                 <input type="checkbox" 
                        name="player_{{ player.name }}" 
                        id="player_{{ player.name }}" 
-                       value="1">
+                       value="1"
+                       data-mensalista="{{ 'true' if player.mensalista else 'false' }}">
                 <label for="player_{{ player.name }}">
                     {{ player.name }}
                     <span class="rating-{{ player.category.value }}">
                         ({{ player.overall_rating }})
                     </span>
                     <br>
-                    <small>{{ player.position.value }}</small>
+                    <small>{{ player.intensity.value }}</small>
                 </label>
             </div>
             {% endfor %}
@@ -110,6 +112,12 @@
     <script>
         function selectAllPlayers() {
             document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+                checkbox.checked = true;
+            });
+        }
+
+        function selectMensalistas() {
+            document.querySelectorAll('input[data-mensalista="true"]').forEach(checkbox => {
                 checkbox.checked = true;
             });
         }
@@ -134,7 +142,7 @@
 
             // Processa cada linha
             lines.forEach(line => {
-                const [name, position, level] = line.split(',').map(item => item.trim());
+                const [name, intensity, rating] = line.split(',').map(item => item.trim());
                 // Procura por checkbox que contenha o nome do jogador
                 const checkboxes = document.querySelectorAll('input[type="checkbox"]');
                 checkboxes.forEach(checkbox => {
