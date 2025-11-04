@@ -34,6 +34,14 @@
             display: flex;
             gap: 10px;
         }
+        .selection-status {
+            margin: 10px 0;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: #f8f9fa;
+            color: #333;
+        }
         .import-section {
             margin: 20px 0;
             padding: 15px;
@@ -55,6 +63,27 @@
         button:hover {
             background-color: #e9ecef;
         }
+
+        /* Modal simples para edição */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal {
+            background: #fff;
+            border-radius: 8px;
+            padding: 16px;
+            width: min(680px, 96vw);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        }
+        .modal header { font-weight: bold; margin-bottom: 8px; }
+        .modal .grid { display: grid; grid-template-columns: 1fr 120px 160px 160px; gap: 8px; }
+        .modal footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
     </style>
 </head>
 <body>
@@ -71,7 +100,7 @@
                 </div>
                 <div>
                     <label>Avaliação<br>
-                        <input type="number" id="new_rating" step="0.1" min="0" max="10" placeholder="4.0" />
+                        <input type="number" id="new_rating" step="1" min="1" max="7" placeholder="4" />
                     </label>
                 </div>
                 <div>
@@ -106,6 +135,7 @@
             <button type="button" onclick="selectMensalistas()">Selecionar Mensalistas</button>
             <button type="button" onclick="deselectAllPlayers()">Limpar Seleção</button>
             <button type="button" onclick="toggleImportSection()">Importar Jogadores</button>
+            <button type="button" onclick="showSelected()">Mostrar Selecionados</button>
         </div>
 
         <div id="importSection" class="import-section" style="display: none;">
@@ -117,6 +147,9 @@
         </div>
 
         <h2>Selecione os Jogadores:</h2>
+        <div class="selection-status">
+            Selecionados: <strong id="selCount">0</strong> — Faltam: <strong id="selRemain">20</strong> de 20
+        </div>
         <div class="player-list">
             {% for player in players %}
             <div class="player-card">
@@ -147,23 +180,78 @@
         <button type="submit">Balancear Times</button>
     </form>
 
+    <!-- Modal de Edição -->
+    <div id="editModal" class="modal-overlay" aria-hidden="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+            <header id="editTitle">Editar Jogador</header>
+            <input type="hidden" id="edit_old_name" />
+            <div class="grid">
+                <div>
+                    <label>Nome<br>
+                        <input type="text" id="edit_name" />
+                    </label>
+                </div>
+                <div>
+                    <label>Avaliação<br>
+                        <input type="number" id="edit_rating" step="1" min="1" max="7" />
+                    </label>
+                </div>
+                <div>
+                    <label>Intensidade<br>
+                        <select id="edit_intensity">
+                            <option value="HIGH">HIGH</option>
+                            <option value="LOW">LOW</option>
+                        </select>
+                    </label>
+                </div>
+                <div style="display:flex; align-items:center;">
+                    <label>
+                        <input type="checkbox" id="edit_mensalista" /> Mensalista
+                    </label>
+                </div>
+            </div>
+            <footer>
+                <button type="button" id="btnCancelEdit">Cancelar</button>
+                <button type="button" id="btnSaveEdit">Salvar</button>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Modal de Selecionados -->
+    <div id="selectedModal" class="modal-overlay" aria-hidden="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="selectedTitle">
+            <header id="selectedTitle">Jogadores Selecionados</header>
+            <div id="selectedList" style="max-height:50vh; overflow:auto; padding:8px; border:1px solid #eee; border-radius:6px; background:#fafafa;"></div>
+            <footer>
+                <button type="button" id="btnCloseSelected">Fechar</button>
+            </footer>
+        </div>
+    </div>
+
     <script>
+        function getPlayerCheckboxes() {
+            return Array.from(document.querySelectorAll('input[type="checkbox"][name^="player_"]'));
+        }
+
         function selectAllPlayers() {
-            document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            getPlayerCheckboxes().forEach(checkbox => {
                 checkbox.checked = true;
             });
+            updateSelectedCount();
         }
 
         function selectMensalistas() {
-            document.querySelectorAll('input[data-mensalista="true"]').forEach(checkbox => {
+            document.querySelectorAll('input[type="checkbox"][name^="player_"][data-mensalista="true"]').forEach(checkbox => {
                 checkbox.checked = true;
             });
+            updateSelectedCount();
         }
 
         function deselectAllPlayers() {
-            document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            getPlayerCheckboxes().forEach(checkbox => {
                 checkbox.checked = false;
             });
+            updateSelectedCount();
         }
 
         function toggleImportSection() {
@@ -182,23 +270,77 @@
             lines.forEach(line => {
                 const [name, intensity, rating] = line.split(',').map(item => item.trim());
                 // Procura por checkbox que contenha o nome do jogador
-                const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+                const checkboxes = document.querySelectorAll('input[type="checkbox"][name^="player_"]');
                 checkboxes.forEach(checkbox => {
                     if (checkbox.id.toLowerCase().includes(name.toLowerCase())) {
                         checkbox.checked = true;
                     }
                 });
             });
+            updateSelectedCount();
+        }
+
+        // Contador dinâmico de seleção (alvo: 20)
+        function updateSelectedCount() {
+            const TARGET = 20;
+            const count = getPlayerCheckboxes().filter(cb => cb.checked).length;
+            const remain = Math.max(0, TARGET - count);
+            const selCount = document.getElementById('selCount');
+            const selRemain = document.getElementById('selRemain');
+            if (selCount) selCount.textContent = count;
+            if (selRemain) selRemain.textContent = remain;
+        }
+
+        // Observa mudanças nos checkboxes
+        getPlayerCheckboxes().forEach(cb => {
+            cb.addEventListener('change', updateSelectedCount);
+        });
+
+        // Inicializa contador ao carregar
+        updateSelectedCount();
+
+        // Bloqueia envio se menos de 20 selecionados
+        document.getElementById('balanceForm').addEventListener('submit', function(e) {
+            const count = getPlayerCheckboxes().filter(cb => cb.checked).length;
+            if (count < 20) {
+                e.preventDefault();
+                alert('Selecione pelo menos 20 jogadores para formar os times.');
+            }
+        });
+
+        // Mostra lista de selecionados
+        const selectedModal = document.getElementById('selectedModal');
+        const btnCloseSelected = document.getElementById('btnCloseSelected');
+        function openSelectedModal() { selectedModal.style.display = 'flex'; }
+        function closeSelectedModal() { selectedModal.style.display = 'none'; }
+        selectedModal.addEventListener('click', (e) => { if (e.target === selectedModal) closeSelectedModal(); });
+        if (btnCloseSelected) btnCloseSelected.addEventListener('click', closeSelectedModal);
+
+        function showSelected() {
+            const listDiv = document.getElementById('selectedList');
+            const selected = getPlayerCheckboxes().filter(cb => cb.checked).map(cb => cb.id.replace(/^player_/, ''));
+            if (!selected.length) {
+                listDiv.innerHTML = '<em>Nenhum jogador selecionado.</em>';
+            } else {
+                listDiv.innerHTML = '<ol style="margin:0; padding-left:20px;">' +
+                    selected.map(n => `<li>${n}</li>`).join('') + '</ol>';
+            }
+            openSelectedModal();
         }
 
         async function addPlayer() {
             const name = document.getElementById('new_name').value.trim();
-            const rating = document.getElementById('new_rating').value;
+            const ratingInput = document.getElementById('new_rating').value;
+            const rating = parseInt(ratingInput, 10);
             const intensity = document.getElementById('new_intensity').value;
             const mensalista = document.getElementById('new_mensalista').checked;
 
-            if (!name || rating === '') {
+            if (!name || Number.isNaN(rating)) {
                 alert('Preencha nome e avaliação.');
+                return;
+            }
+            if (rating < 1 || rating > 7) {
+                alert('A avaliação deve ser um inteiro entre 1 e 7.');
                 return;
             }
 
@@ -218,31 +360,53 @@
             }
         }
 
+        // Modal helpers
+        const editModal = document.getElementById('editModal');
+        const editOldName = document.getElementById('edit_old_name');
+        const editName = document.getElementById('edit_name');
+        const editRating = document.getElementById('edit_rating');
+        const editIntensity = document.getElementById('edit_intensity');
+        const editMensalista = document.getElementById('edit_mensalista');
+        const btnCancelEdit = document.getElementById('btnCancelEdit');
+        const btnSaveEdit = document.getElementById('btnSaveEdit');
+
+        function openEditModal() { editModal.style.display = 'flex'; }
+        function closeEditModal() { editModal.style.display = 'none'; }
+        editModal.addEventListener('click', (e) => { if (e.target === editModal) closeEditModal(); });
+        btnCancelEdit.addEventListener('click', closeEditModal);
+
         async function editPlayer(btn) {
             const card = btn.closest('.player-card');
             const checkbox = card.querySelector('input[type="checkbox"]');
             const oldName = checkbox.dataset.name;
             const currentRating = checkbox.dataset.rating;
-            const currentIntensity = checkbox.dataset.intensity || 'HIGH';
+            const currentIntensity = (checkbox.dataset.intensity || 'HIGH').toUpperCase();
             const currentMensalista = checkbox.dataset.mensalista === 'true';
 
-            const name = prompt('Nome:', oldName);
-            if (name === null) return;
-            const rating = prompt('Avaliação (0-10):', currentRating);
-            if (rating === null) return;
-            const intensity = prompt('Intensidade (HIGH/LOW):', currentIntensity).toUpperCase();
-            if (intensity !== 'HIGH' && intensity !== 'LOW') {
-                alert('Intensidade deve ser HIGH ou LOW');
-                return;
-            }
-            const mensalistaStr = prompt('Mensalista? (s/n):', currentMensalista ? 's' : 'n');
-            const mensalista = (mensalistaStr || '').toLowerCase().startsWith('s');
+            editOldName.value = oldName;
+            editName.value = oldName;
+            editRating.value = currentRating;
+            editIntensity.value = currentIntensity;
+            editMensalista.checked = currentMensalista;
+
+            openEditModal();
+        }
+
+        btnSaveEdit.addEventListener('click', async () => {
+            const old_name = editOldName.value;
+            const name = editName.value.trim();
+            const rating = parseInt(editRating.value, 10);
+            const intensity = editIntensity.value;
+            const mensalista = editMensalista.checked;
+
+            if (!name || Number.isNaN(rating)) { alert('Preencha nome e avaliação.'); return; }
+            if (rating < 1 || rating > 7) { alert('A avaliação deve ser um inteiro entre 1 e 7.'); return; }
 
             try {
                 const res = await fetch('{{ url_for('update_player') }}', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ old_name: oldName, name, rating, intensity, mensalista })
+                    body: JSON.stringify({ old_name, name, rating, intensity, mensalista })
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Erro ao atualizar');
@@ -250,7 +414,7 @@
             } catch (e) {
                 alert(e.message);
             }
-        }
+        });
 
         async function deletePlayer(btn) {
             const card = btn.closest('.player-card');

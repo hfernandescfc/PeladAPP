@@ -41,7 +41,7 @@ real_players = [
     Player("Down", 2, Intensity.LOW, mensalista=True),
     Player("Gabriel de Leon", 2, Intensity.HIGH, mensalista=True),
     Player("Guilherme Figueiredo", 5, Intensity.HIGH, mensalista=True),
-    Player("Guila", 4, Intensity.LOW, mensalista=False),
+    Player("Guila", 4, Intensity.LOW, mensalista=True),
     Player("Hugo", 4, Intensity.HIGH, mensalista=True),
     Player("Falcão", 4, Intensity.HIGH, mensalista=True),
     Player("Lucas Souza", 4, Intensity.LOW, mensalista=True),
@@ -50,7 +50,7 @@ real_players = [
     Player("Pato", 3, Intensity.LOW, mensalista=True),
     Player("Paulo Freitas", 1, Intensity.LOW, mensalista=True),
     Player("Arthur Melo", 3, Intensity.LOW, mensalista=True),
-    Player("Sammy", 3, Intensity.HIGH, mensalista=True),
+    Player("Sammy", 3, Intensity.HIGH, mensalista=False),
     Player("Serginho", 6, Intensity.LOW, mensalista=True),
     Player("SHEIK", 1, Intensity.LOW, mensalista=True),
 
@@ -71,8 +71,8 @@ real_players = [
     Player("Monteiro", 7, Intensity.HIGH, mensalista=False),
     Player("Jonas", 4, Intensity.LOW, mensalista=False),
     Player("PAJÉ", 6, Intensity.HIGH, mensalista=False),
-    Player("Gustavo", 4, Intensity.LOW, mensalista=False),
-    Player("Sabugo", 3, Intensity.LOW, mensalista=False),
+    Player("Gustavo", 4, Intensity.LOW, mensalista=True),
+    Player("Sabugo", 2, Intensity.LOW, mensalista=False),
     Player("Junior", 4, Intensity.LOW, mensalista=False),
     Player("Marcelo Torres", 5, Intensity.LOW, mensalista=False),
     Player("Eduardo Jorge", 4, Intensity.LOW, mensalista=False),
@@ -189,6 +189,50 @@ class TeamBalancer:
             raise ValueError("Não foi possível encontrar uma distribuição válida com a distribuição equilibrada de jogadores de alta intensidade")
 
         return best_distribution
+
+    def distribute_players_dissimilar_strength(self) -> List[List[Player]]:
+        # Objetivo: maximizar a diferença de força entre o time mais forte e o mais fraco
+        if self.players_per_team == 0:
+            return [[] for _ in range(self.num_teams)]
+
+        sorted_players = sorted(self.players, key=lambda p: p.overall_rating, reverse=True)
+        teams: List[List[Player]] = [[] for _ in range(self.num_teams)]
+
+        # Preenche cada time em blocos ordenados para criar disparidade
+        idx = 0
+        for t in range(self.num_teams):
+            while len(teams[t]) < self.players_per_team and idx < len(sorted_players):
+                teams[t].append(sorted_players[idx])
+                idx += 1
+
+        return teams
+
+    def distribute_players_dissimilar_intensity(self) -> List[List[Player]]:
+        # Objetivo: concentrar alta intensidade nos primeiros times para maximizar diferença
+        if self.players_per_team == 0:
+            return [[] for _ in range(self.num_teams)]
+
+        high = [p for p in self.players if p.intensity == Intensity.HIGH]
+        low = [p for p in self.players if p.intensity == Intensity.LOW]
+
+        # Ordena por força para consistência determinística
+        high.sort(key=lambda p: p.overall_rating, reverse=True)
+        low.sort(key=lambda p: p.overall_rating, reverse=True)
+
+        teams: List[List[Player]] = [[] for _ in range(self.num_teams)]
+
+        # Primeiro, enche os primeiros times com HIGH até onde der
+        for t in range(self.num_teams):
+            while len(teams[t]) < self.players_per_team and high:
+                teams[t].append(high.pop(0))
+
+        # Depois completa restantes com LOW
+        for t in range(self.num_teams):
+            while len(teams[t]) < self.players_per_team and low:
+                teams[t].append(low.pop(0))
+
+        # Se ainda sobrar alguém (por arredondamento), ignora para manter tamanhos iguais
+        return teams
 
     def print_teams(self, teams: List[List[Player]]) -> None:
         print("\nTimes Balanceados:")

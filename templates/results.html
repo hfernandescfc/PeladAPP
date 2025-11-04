@@ -155,17 +155,56 @@
         {% endfor %}
     </div>
 
-    <!-- Seção de compartilhamento para WhatsApp -->
+    <!-- Seção de compartilhamento para WhatsApp - Opção 1 -->
     <div class="team-card" style="margin-top: 20px; padding: 12px;">
-        <h3 style="margin-top:0;">Texto para WhatsApp</h3>
-        <textarea id="whatsappText" readonly style="width:100%; min-height: 160px; padding: 8px;">
-{{ whatsapp_text }}
-        </textarea>
+        <h3 style="margin-top:0;">Texto para WhatsApp — Opção 1</h3>
+        <textarea id="whatsappText0" readonly style="width:100%; min-height: 160px; padding: 8px;">{{ whatsapp_text }}</textarea>
         <div class="buttons-container">
-            <button class="button primary-button" type="button" onclick="copyWhatsappText()">Copiar texto</button>
-            <button class="button secondary-button" type="button" onclick="openWhatsApp()">Abrir WhatsApp</button>
+            <button class="button primary-button" type="button" onclick="copyWhatsappText(0)">Copiar texto</button>
+            <button class="button secondary-button" type="button" onclick="openWhatsApp(0)">Abrir WhatsApp</button>
         </div>
-        <div id="copyStatus" style="text-align:center; color:#2c3e50; display:none;">Copiado!</div>
+        <div id="copyStatus0" style="text-align:center; color:#2c3e50; display:none;">Copiado!</div>
+    </div>
+
+    <div class="header" style="margin-top: 20px;">
+        <h2>Opção 2</h2>
+    </div>
+
+    <div class="teams-container">
+        {% for team in alt_teams %}
+        <div class="team-card">
+            <div class="team-header team-{{ team_colors[loop.index0] }}">
+                <h2>Time {{ team_names[loop.index0] }}</h2>
+                <div class="score-display">
+                    <input type="number" class="score-input" min="0" placeholder="0">
+                </div>
+            </div>
+            {% for player in team.players %}
+            <div class="player-item">
+                <strong>{{ player.name }}</strong>
+                <span class="rating-{{ player.category.value }}">
+                    ({{ player.overall_rating }})
+                </span>
+                <br>
+                <small>{{ player.intensity.value }}</small>
+            </div>
+            {% endfor %}
+            <div class="team-strength">
+                Força do Time: {{ team.strength }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Seção de compartilhamento para WhatsApp - Opção 2 -->
+    <div class="team-card" style="margin-top: 20px; padding: 12px;">
+        <h3 style="margin-top:0;">Texto para WhatsApp — Opção 2</h3>
+        <textarea id="whatsappText1" readonly style="width:100%; min-height: 160px; padding: 8px;">{{ whatsapp_text_alt }}</textarea>
+        <div class="buttons-container">
+            <button class="button primary-button" type="button" onclick="copyWhatsappText(1)">Copiar texto</button>
+            <button class="button secondary-button" type="button" onclick="openWhatsApp(1)">Abrir WhatsApp</button>
+        </div>
+        <div id="copyStatus1" style="text-align:center; color:#2c3e50; display:none;">Copiado!</div>
     </div>
 
     <div class="buttons-container">
@@ -179,7 +218,12 @@
                 <input type="checkbox" name="player_{{ player.name }}" value="1" checked>
             {% endfor %}
         {% endfor %}
-        <input type="number" name="num_teams" value="{{ teams|length }}">
+        {% for team in alt_teams %}
+            {% for player in team.players %}
+                <input type="checkbox" name="player_{{ player.name }}" value="1" checked>
+            {% endfor %}
+        {% endfor %}
+        <input type="number" name="num_teams" value="{{ num_teams }}">
     </form>
 
     <script>
@@ -198,8 +242,8 @@
             });
         });
 
-        function copyWhatsappText() {
-            const ta = document.getElementById('whatsappText');
+        function copyWhatsappText(idx) {
+            const ta = document.getElementById('whatsappText' + idx);
             ta.select();
             ta.setSelectionRange(0, 99999);
             const ok = navigator.clipboard ?
@@ -207,14 +251,14 @@
                 document.execCommand('copy');
 
             Promise.resolve(ok).finally(() => {
-                const msg = document.getElementById('copyStatus');
+                const msg = document.getElementById('copyStatus' + idx);
                 msg.style.display = 'block';
                 setTimeout(() => { msg.style.display = 'none'; }, 1500);
             });
         }
 
-        function openWhatsApp() {
-            const text = document.getElementById('whatsappText').value;
+        function openWhatsApp(idx) {
+            const text = document.getElementById('whatsappText' + idx).value;
             const url = 'https://wa.me/?text=' + encodeURIComponent(text);
             window.open(url, '_blank');
         }
