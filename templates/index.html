@@ -281,7 +281,7 @@
         }
 
         // Contador dinâmico de seleção (alvo: 20)
-        function updateSelectedCount() {
+        function saveSelection(){try{const names=getPlayerCheckboxes().filter(cb=>cb.checked).map(cb=>cb.dataset.name);localStorage.setItem("selectedPlayers",JSON.stringify(names));}catch(e){}} function restoreSelectionFromStorage(){try{const saved=JSON.parse(localStorage.getItem("selectedPlayers")||"[]");const set=new Set(saved);getPlayerCheckboxes().forEach(cb=>{cb.checked=set.has(cb.dataset.name);});}catch(e){}} function updateSelectedCount() {
             const TARGET = 20;
             const count = getPlayerCheckboxes().filter(cb => cb.checked).length;
             const remain = Math.max(0, TARGET - count);
@@ -296,6 +296,7 @@
             cb.addEventListener('change', updateSelectedCount);
         });
 
+        restoreSelectionFromStorage();
         // Inicializa contador ao carregar
         updateSelectedCount();
 
@@ -354,6 +355,10 @@
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Erro ao adicionar');
+                try {
+                    const names = getPlayerCheckboxes().filter(cb => cb.checked).map(cb => cb.dataset.name);
+                    localStorage.setItem('selectedPlayers', JSON.stringify(names));
+                } catch (e) {}
                 location.reload();
             } catch (e) {
                 alert(e.message);
@@ -410,6 +415,11 @@
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Erro ao atualizar');
+                try {
+                    const saved = new Set(JSON.parse(localStorage.getItem('selectedPlayers') || '[]'));
+                    if (saved.has(old_name)) { saved.delete(old_name); saved.add(name); }
+                    localStorage.setItem('selectedPlayers', JSON.stringify(Array.from(saved)));
+                } catch (e) {}
                 location.reload();
             } catch (e) {
                 alert(e.message);
@@ -430,6 +440,11 @@
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Erro ao excluir');
+                try {
+                    const saved = new Set(JSON.parse(localStorage.getItem('selectedPlayers') || '[]'));
+                    if (saved.has(name)) { saved.delete(name); }
+                    localStorage.setItem('selectedPlayers', JSON.stringify(Array.from(saved)));
+                } catch (e) {}
                 location.reload();
             } catch (e) {
                 alert(e.message);
@@ -438,3 +453,6 @@
     </script>
 </body>
 </html>
+
+
+
