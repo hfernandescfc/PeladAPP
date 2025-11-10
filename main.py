@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify
-from team_balancer import TeamBalancer, Player, real_players, Intensity
+from team_balancer import TeamBalancer, Player, real_players, Intensity, save_players
 import os
 
 app = Flask(__name__)
@@ -139,6 +139,8 @@ def add_players():
 
         # Add the new players to the existing list
         real_players.extend(new_players)
+        # Persist
+        save_players(real_players)
 
         return jsonify({'message': 'Jogadores adicionados com sucesso'}), 200
     except Exception as e:
@@ -175,6 +177,8 @@ def update_player():
         if intensity_key:
             target.intensity = Intensity[intensity_key.upper()]
         target.mensalista = mensalista
+        # Persist
+        save_players(real_players)
 
         return jsonify({'message': 'Jogador atualizado com sucesso'}), 200
     except Exception as e:
@@ -194,6 +198,8 @@ def delete_player():
             return jsonify({'error': 'Jogador não encontrado'}), 404
 
         real_players.pop(idx)
+        # Persist
+        save_players(real_players)
         return jsonify({'message': 'Jogador removido com sucesso'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 400

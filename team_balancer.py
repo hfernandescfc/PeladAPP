@@ -1,7 +1,11 @@
 from typing import List, Dict, Tuple
 import random
+import json
+import os
+import logging
 from dataclasses import dataclass
 from enum import Enum
+
 
 class Category(Enum):
     ELITE = "elite"
@@ -9,16 +13,18 @@ class Category(Enum):
     REGULAR = "regular"
     BEGINNER = "iniciante"
 
+
 class Intensity(Enum):
     HIGH = "alta"
     LOW = "baixa"
+
 
 @dataclass
 class Player:
     name: str
     overall_rating: float
-    intensity: Intensity  # New attribute
-    mensalista: bool = False 
+    intensity: Intensity
+    mensalista: bool = False
 
     @property
     def category(self) -> Category:
@@ -31,7 +37,8 @@ class Player:
         else:
             return Category.BEGINNER
 
-# Lista real de jogadores com intensidade (adicionada aleatoriamente para manter o exemplo)
+
+# Lista padrão de jogadores (usada no primeiro run ou como fallback)
 real_players = [
     Player("Ivo", 4, Intensity.HIGH, mensalista=True),
     Player("Vaca", 3, Intensity.LOW, mensalista=True),
@@ -43,7 +50,7 @@ real_players = [
     Player("Guilherme Figueiredo", 5, Intensity.HIGH, mensalista=True),
     Player("Guila", 4, Intensity.LOW, mensalista=True),
     Player("Hugo", 4, Intensity.HIGH, mensalista=True),
-    Player("Falcão", 4, Intensity.HIGH, mensalista=True),
+    Player("Falcǜo", 4, Intensity.HIGH, mensalista=True),
     Player("Lucas Souza", 4, Intensity.LOW, mensalista=True),
     Player("Luquinhas", 6, Intensity.HIGH, mensalista=True),
     Player("Nego", 5, Intensity.HIGH, mensalista=True),
@@ -56,21 +63,21 @@ real_players = [
 
     # Diaristas
     Player("PA", 7, Intensity.HIGH, mensalista=False),
-    Player("Antônio", 2, Intensity.LOW, mensalista=False),
+    Player("Ant��nio", 2, Intensity.LOW, mensalista=False),
     Player("Dias", 2, Intensity.LOW, mensalista=False),
-    Player("Girão", 3, Intensity.HIGH, mensalista=False),
+    Player("Girǜo", 3, Intensity.HIGH, mensalista=False),
     Player("Diogo", 6, Intensity.HIGH, mensalista=False),
     Player("Diego Spencer", 3, Intensity.LOW, mensalista=False),
-    
+
     Player("Davi", 6, Intensity.HIGH, mensalista=False),
-    Player("ERMÍRIO", 4, Intensity.LOW, mensalista=False),
-    
+    Player("ERM�?RIO", 4, Intensity.LOW, mensalista=False),
+
     Player("Fernando Henrique", 6, Intensity.HIGH, mensalista=False),
     Player("Gabriel Lira", 4, Intensity.HIGH, mensalista=False),
     Player("Mikhail", 3, Intensity.LOW, mensalista=False),
     Player("Monteiro", 7, Intensity.HIGH, mensalista=False),
     Player("Jonas", 4, Intensity.LOW, mensalista=False),
-    Player("PAJÉ", 6, Intensity.HIGH, mensalista=False),
+    Player("PAJ�%", 6, Intensity.HIGH, mensalista=False),
     Player("Gustavo", 4, Intensity.LOW, mensalista=True),
     Player("Sabugo", 2, Intensity.LOW, mensalista=False),
     Player("Junior", 4, Intensity.LOW, mensalista=False),
@@ -79,6 +86,84 @@ real_players = [
     Player("Vareta", 2, Intensity.LOW, mensalista=False)
 
 ]
+
+
+# Persistência simples em arquivo JSON
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+_env_path = os.environ.get('PLAYERS_FILE')
+if _env_path:
+    DATA_FILE = _env_path if os.path.isabs(_env_path) else os.path.join(BASE_DIR, _env_path)
+else:
+    DATA_FILE = os.path.join(BASE_DIR, 'players.json')
+
+logger = logging.getLogger(__name__)
+
+
+def _player_to_dict(p: Player) -> Dict:
+    return {
+        'name': p.name,
+        'rating': int(p.overall_rating),
+        'intensity': p.intensity.name,
+        'mensalista': bool(p.mensalista),
+    }
+
+
+def _player_from_dict(d: Dict) -> Player:
+    name = d['name']
+    rating = int(d.get('rating', d.get('overall_rating', 0)))
+    intensity_key = str(d.get('intensity', 'LOW')).upper()
+    intensity = Intensity[intensity_key]
+    mensalista = bool(d.get('mensalista', False))
+    return Player(name, rating, intensity, mensalista)
+
+
+def save_players(players: List[Player]) -> None:
+    """Persiste jogadores em escrita atômica; loga erros ao invés de silenciar."""
+    try:
+        data = [_player_to_dict(p) for p in players]
+        os.makedirs(os.path.dirname(DATA_FILE) or '.', exist_ok=True)
+        tmp_path = DATA_FILE + '.tmp'
+        with open(tmp_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        os.replace(tmp_path, DATA_FILE)
+    except Exception:
+        logger.exception("Falha ao salvar jogadores em %s", DATA_FILE)
+
+
+def _load_players_from_file() -> List[Player]:
+    """Carrega jogadores do JSON; ignora registros inválidos ao invés de descartar tudo."""
+    if not os.path.exists(DATA_FILE):
+        return []
+    try:
+        with open(DATA_FILE, 'r', encoding='utf-8') as f:
+            raw = json.load(f)
+        loaded: List[Player] = []
+        for idx, item in enumerate(raw or []):
+            try:
+                loaded.append(_player_from_dict(item))
+            except Exception:
+                logger.warning("Registro inválido em %s na posição %s: %r", DATA_FILE, idx, item)
+        return loaded
+    except Exception:
+        logger.exception("Falha ao carregar jogadores de %s", DATA_FILE)
+        return []
+
+
+def load_or_init_players() -> None:
+    """Substitui real_players por dados do arquivo; se vazio/inexistente, inicializa salvando padrão."""
+    loaded = _load_players_from_file()
+    global real_players
+    if loaded:
+        real_players.clear()
+        real_players.extend(loaded)
+    else:
+        # Primeira execução: salva a lista padrão para persistir
+        save_players(real_players)
+
+
+# Carrega ou inicializa ao importar o módulo
+load_or_init_players()
+
 
 class TeamBalancer:
     def __init__(self, players: List[Player], num_teams: int = 4):
@@ -169,8 +254,10 @@ class TeamBalancer:
                         candidates = remaining_players[:candidate_count]
 
                         if candidates:
-                            best_candidate = min(candidates, 
-                                             key=lambda p: abs(self.calculate_team_strength(team + [p]) - 4.0))
+                            best_candidate = min(
+                                candidates,
+                                key=lambda p: abs(self.calculate_team_strength(team + [p]) - 4.0),
+                            )
                             team.append(best_candidate)
                             remaining_players.remove(best_candidate)
 
@@ -186,7 +273,9 @@ class TeamBalancer:
                     break
 
         if best_distribution is None:
-            raise ValueError("Não foi possível encontrar uma distribuição válida com a distribuição equilibrada de jogadores de alta intensidade")
+            raise ValueError(
+                "Não foi possível encontrar uma distribuição válida com a distribuição equilibrada de jogadores de alta intensidade"
+            )
 
         return best_distribution
 
@@ -247,6 +336,11 @@ class TeamBalancer:
             for player in sorted(team, key=lambda x: x.overall_rating, reverse=True):
                 print(f"- {player.name}: {player.overall_rating} ({player.intensity.value})")
 
-        print("\nEstatísticas Gerais:")
-        print(f"Diferença entre time mais forte e mais fraco: {max(all_strengths) - min(all_strengths):.2f}")
-        print(f"Desvio máximo da média: {max(abs(s - sum(all_strengths)/len(all_strengths)) for s in all_strengths):.2f}")
+        print("\nEstatisticas Gerais:")
+        print(
+            f"Diferença entre time mais forte e mais fraco: {max(all_strengths) - min(all_strengths):.2f}"
+        )
+        print(
+            f"Desvio máximo da média: {max(abs(s - sum(all_strengths)/len(all_strengths)) for s in all_strengths):.2f}"
+        )
+
