@@ -7,13 +7,13 @@
   },
   {
     "name": "Vaca",
-    "rating": 1,
+    "rating": 3,
     "intensity": "LOW",
     "mensalista": true
   },
   {
     "name": "Caio",
-    "rating": 7,
+    "rating": 1,
     "intensity": "LOW",
     "mensalista": true
   },
@@ -37,13 +37,13 @@
   },
   {
     "name": "Gabriel de Leon",
-    "rating": 2,
+    "rating": 1,
     "intensity": "HIGH",
     "mensalista": true
   },
   {
     "name": "Guilherme Figueiredo",
-    "rating": 5,
+    "rating": 6,
     "intensity": "HIGH",
     "mensalista": true
   },

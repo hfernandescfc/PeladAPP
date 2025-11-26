@@ -277,7 +277,10 @@ class TeamBalancer:
                 "Não foi possível encontrar uma distribuição válida com a distribuição equilibrada de jogadores de alta intensidade"
             )
 
-        return best_distribution
+        # Embaralha a ordem dos times para variar a apresentacao (cores/posicoes)
+        final_distribution = best_distribution[:]
+        random.shuffle(final_distribution)
+        return final_distribution
 
     def distribute_players_dissimilar_strength(self) -> List[List[Player]]:
         # Objetivo: maximizar a diferença de força entre o time mais forte e o mais fraco
@@ -343,4 +346,3 @@ class TeamBalancer:
         print(
             f"Desvio máximo da média: {max(abs(s - sum(all_strengths)/len(all_strengths)) for s in all_strengths):.2f}"
         )
-
