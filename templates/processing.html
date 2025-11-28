@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerando times...</title>
+    <style>
+        body { background: #0b1220; color: #e2e8f0; font-family: "Inter", system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .card { background: #0f172a; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 24px; width: min(440px, 90vw); text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,0.35); }
+        .spinner { width: 48px; height: 48px; border: 4px solid rgba(255,255,255,0.2); border-top-color: #22c55e; border-radius: 50%; margin: 18px auto; animation: spin 1s linear infinite; }
+        .muted { color: #94a3b8; font-size: 0.95rem; }
+        .error { color: #f87171; margin-top: 12px; }
+        button { margin-top: 16px; padding: 10px 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: #22c55e; color: #0b1220; font-weight: 700; cursor: pointer; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Gerando times</h2>
+        <div class="spinner"></div>
+        <p class="muted">Processando em segundo plano...</p>
+        <div id="errorBox" class="error" style="display:none;"></div>
+        <button id="retryBtn" style="display:none;" onclick="window.location.href='/'">Voltar</button>
+    </div>
+
+    <script>
+        const jobId = "{{ job_id }}";
+        const statusUrl = "{{ url_for('balance_status', job_id='__ID__') }}".replace('__ID__', jobId);
+        const resultUrl = "{{ url_for('balance_result', job_id='__ID__') }}".replace('__ID__', jobId);
+        const errorBox = document.getElementById('errorBox');
+        const retryBtn = document.getElementById('retryBtn');
+
+        async function poll() {
+            try {
+                const res = await fetch(statusUrl);
+                if (!res.ok) throw new Error('status HTTP ' + res.status);
+                const data = await res.json();
+                if (data.status === 'done') {
+                    window.location.href = resultUrl;
+                } else if (data.status === 'error') {
+                    errorBox.textContent = data.error || 'Erro desconhecido ao gerar times.';
+                    errorBox.style.display = 'block';
+                    retryBtn.style.display = 'inline-block';
+                } else if (data.status === 'not_found') {
+                    errorBox.textContent = 'Tarefa não encontrada.';
+                    errorBox.style.display = 'block';
+                    retryBtn.style.display = 'inline-block';
+                } else {
+                    setTimeout(poll, 1000);
+                }
+            } catch (e) {
+                errorBox.textContent = 'Falha ao consultar status. Tentando novamente...';
+                errorBox.style.display = 'block';
+                setTimeout(poll, 2000);
+            }
+        }
+        poll();
+    </script>
+</body>
+</html>

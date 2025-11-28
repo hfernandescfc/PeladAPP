@@ -1,8 +1,105 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+from flask import Flask, render_template, request, jsonify
 from team_balancer import TeamBalancer, Player, real_players, Intensity, save_players
 import os
+import uuid
+import threading
+
 
 app = Flask(__name__)
+
+# Armazena jobs de balanceamento em memória simples
+job_store = {}
+job_lock = threading.Lock()
+
+
+def _build_balance_context(selected_players, num_teams):
+    """Gera contexto com duas opções de times balanceados."""
+    import random
+
+    balancer = TeamBalancer(selected_players, num_teams)
+
+    def canonical(teams):
+        return tuple(sorted(tuple(sorted(p.name for p in team)) for team in teams))
+
+    def pair_set(teams):
+        names_per_team = [[p.name for p in team] for team in teams]
+        pairs = set()
+        for names in names_per_team:
+            for i in range(len(names)):
+                for j in range(i + 1, len(names)):
+                    pairs.add(frozenset((names[i], names[j])))
+        return pairs
+
+    candidates = []
+    seen = set()
+    state = random.getstate()
+    try:
+        seed_base = 12345
+        for k in range(30):
+            random.seed(seed_base + 97 * k)
+            dist = balancer.distribute_players()
+            key = canonical(dist)
+            if key not in seen:
+                candidates.append(dist)
+                seen.add(key)
+            if len(candidates) >= 6:
+                break
+    finally:
+        random.setstate(state)
+
+    if not candidates:
+        raise ValueError('Não foi possível gerar opções balanceadas')
+
+    if len(candidates) == 1:
+        first = candidates[0]
+        second = candidates[0]
+    else:
+        best_pair = (candidates[0], candidates[1])
+        best_overlap = float('inf')
+        pair_sets = [pair_set(c) for c in candidates]
+        for i in range(len(candidates)):
+            for j in range(i + 1, len(candidates)):
+                overlap = len(pair_sets[i] & pair_sets[j])
+                if overlap < best_overlap:
+                    best_overlap = overlap
+                    best_pair = (candidates[i], candidates[j])
+        first, second = best_pair
+
+    options_stats = []
+    whatsapp_texts = []
+    for dist in (first, second):
+        team_stats = []
+        for i, team in enumerate(dist, 1):
+            team_strength = balancer.calculate_team_strength(team)
+            team_stats.append({
+                'number': i,
+                'players': sorted(team, key=lambda x: x.overall_rating, reverse=True),
+                'strength': round(team_strength, 2),
+            })
+
+        options_stats.append(team_stats)
+
+        whatsapp_lines = ["Times formados:"]
+        for i, team in enumerate(team_stats, 1):
+            whatsapp_lines.append(f"Time {i} (Força: {team['strength']:.2f}):")
+            for p in team['players']:
+                try:
+                    intensity_val = getattr(p.intensity, 'value', p.intensity)
+                except Exception:
+                    intensity_val = p.intensity
+                whatsapp_lines.append(f"- {p.name} ({p.overall_rating}) - {intensity_val}")
+            whatsapp_lines.append("")
+        whatsapp_texts.append("\n".join(whatsapp_lines).strip())
+
+    return {
+        'options': options_stats,
+        'whatsapp_texts': whatsapp_texts,
+        'teams': options_stats[0],
+        'alt_teams': options_stats[1] if len(options_stats) > 1 else options_stats[0],
+        'whatsapp_text': whatsapp_texts[0],
+        'whatsapp_text_alt': whatsapp_texts[1] if len(whatsapp_texts) > 1 else whatsapp_texts[0],
+        'num_teams': num_teams,
+    }
 
 
 @app.route('/', methods=['GET'])
@@ -15,7 +112,6 @@ def balance():
     selected_players = []
     num_teams = int(request.form.get('num_teams', 4))
 
-    # Retrieve selected players from the form
     for player in real_players:
         if request.form.get(f'player_{player.name}'):
             selected_players.append(player)
@@ -23,98 +119,45 @@ def balance():
     if len(selected_players) < num_teams:
         return "Erro: Selecione pelo menos um jogador por time", 400
 
-    balancer = TeamBalancer(selected_players, num_teams)
-    try:
-        import random
+    job_id = str(uuid.uuid4())
+    with job_lock:
+        job_store[job_id] = {'status': 'queued', 'error': None, 'ctx': None}
 
-        def canonical(teams):
-            return tuple(sorted(tuple(sorted(p.name for p in team)) for team in teams))
-
-        def pair_set(teams):
-            names_per_team = [[p.name for p in team] for team in teams]
-            pairs = set()
-            for names in names_per_team:
-                for i in range(len(names)):
-                    for j in range(i + 1, len(names)):
-                        pairs.add(frozenset((names[i], names[j])))
-            return pairs
-
-        # Generate multiple balanced candidates and choose two most dissimilar by co-membership
-        candidates = []
-        seen = set()
-        state = random.getstate()
+    def worker(players_snapshot, teams_count, j_id):
         try:
-            seed_base = 12345
-            for k in range(60):
-                random.seed(seed_base + 97 * k)
-                dist = balancer.distribute_players()
-                key = canonical(dist)
-                if key not in seen:
-                    candidates.append(dist)
-                    seen.add(key)
-                if len(candidates) >= 8:
-                    break
-        finally:
-            random.setstate(state)
+            ctx = _build_balance_context(players_snapshot, teams_count)
+            with job_lock:
+                job_store[j_id]['status'] = 'done'
+                job_store[j_id]['ctx'] = ctx
+        except Exception as exc:
+            with job_lock:
+                job_store[j_id]['status'] = 'error'
+                job_store[j_id]['error'] = str(exc)
 
-        if not candidates:
-            raise ValueError('Não foi possível gerar opções balanceadas')
+    threading.Thread(target=worker, args=(list(selected_players), num_teams, job_id), daemon=True).start()
 
-        if len(candidates) == 1:
-            first = candidates[0]
-            second = candidates[0]
-        else:
-            best_pair = (candidates[0], candidates[1])
-            best_overlap = float('inf')
-            pair_sets = [pair_set(c) for c in candidates]
-            for i in range(len(candidates)):
-                for j in range(i + 1, len(candidates)):
-                    overlap = len(pair_sets[i] & pair_sets[j])
-                    if overlap < best_overlap:
-                        best_overlap = overlap
-                        best_pair = (candidates[i], candidates[j])
-            first, second = best_pair
+    return render_template('processing.html', job_id=job_id)
 
-        options_stats = []
-        whatsapp_texts = []
-        for dist in (first, second):
-            team_stats = []
-            for i, team in enumerate(dist, 1):
-                team_strength = balancer.calculate_team_strength(team)
-                team_stats.append({
-                    'number': i,
-                    'players': sorted(team, key=lambda x: x.overall_rating, reverse=True),
-                    'strength': round(team_strength, 2),
-                })
 
-            options_stats.append(team_stats)
+@app.route('/balance_status/<job_id>', methods=['GET'])
+def balance_status(job_id):
+    with job_lock:
+        job = job_store.get(job_id)
+        if not job:
+            return jsonify({'status': 'not_found'}), 404
+        return jsonify({'status': job['status'], 'error': job.get('error')})
 
-            # WhatsApp text for this option
-            whatsapp_lines = ["Times formados:"]
-            for i, team in enumerate(team_stats, 1):
-                whatsapp_lines.append(f"Time {i} (Força: {team['strength']:.2f}):")
-                for p in team['players']:
-                    try:
-                        intensity_val = getattr(p.intensity, 'value', p.intensity)
-                    except Exception:
-                        intensity_val = p.intensity
-                    whatsapp_lines.append(f"- {p.name} ({p.overall_rating}) - {intensity_val}")
-                whatsapp_lines.append("")
-            whatsapp_texts.append("\n".join(whatsapp_lines).strip())
 
-        # Backward-compatible context for template: first as teams, second as alt_teams
-        ctx = {
-            'options': options_stats,
-            'whatsapp_texts': whatsapp_texts,
-            'teams': options_stats[0],
-            'alt_teams': options_stats[1] if len(options_stats) > 1 else options_stats[0],
-            'whatsapp_text': whatsapp_texts[0],
-            'whatsapp_text_alt': whatsapp_texts[1] if len(whatsapp_texts) > 1 else whatsapp_texts[0],
-            'num_teams': num_teams,
-        }
-        return render_template('results.html', **ctx)
-    except ValueError as e:
-        return str(e), 400
+@app.route('/balance_result/<job_id>', methods=['GET'])
+def balance_result(job_id):
+    with job_lock:
+        job = job_store.get(job_id)
+        if not job:
+            return "Tarefa não encontrada", 404
+        if job['status'] != 'done':
+            return "Tarefa ainda não concluída", 202
+        ctx = job['ctx']
+    return render_template('results.html', **ctx)
 
 
 @app.route('/add_players', methods=['POST'])
@@ -137,9 +180,7 @@ def add_players():
             new_player = Player(name, overall_rating, intensity, mensalista)
             new_players.append(new_player)
 
-        # Add the new players to the existing list
         real_players.extend(new_players)
-        # Persist
         save_players(real_players)
 
         return jsonify({'message': 'Jogadores adicionados com sucesso'}), 200
@@ -177,7 +218,6 @@ def update_player():
         if intensity_key:
             target.intensity = Intensity[intensity_key.upper()]
         target.mensalista = mensalista
-        # Persist
         save_players(real_players)
 
         return jsonify({'message': 'Jogador atualizado com sucesso'}), 200
@@ -198,7 +238,6 @@ def delete_player():
             return jsonify({'error': 'Jogador não encontrado'}), 404
 
         real_players.pop(idx)
-        # Persist
         save_players(real_players)
         return jsonify({'message': 'Jogador removido com sucesso'}), 200
     except Exception as e:
