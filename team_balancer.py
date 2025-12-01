@@ -30,7 +30,7 @@ class Player:
     def category(self) -> Category:
         if self.overall_rating >= 6.0:
             return Category.ELITE
-        elif self.overall_rating >= 5.0:
+        elif self.overall_rating >= 4.0:
             return Category.GOOD
         elif self.overall_rating >= 3.0:
             return Category.REGULAR
@@ -44,10 +44,10 @@ real_players = [
     Player("Vaca", 3, Intensity.LOW, mensalista=True),
     Player("Caio", 1, Intensity.LOW, mensalista=True),
     Player("Calafa", 4, Intensity.LOW, mensalista=True),
-    Player("Daniel", 2, Intensity.LOW, mensalista=True),
-    Player("Down", 2, Intensity.LOW, mensalista=True),
-    Player("Gabriel de Leon", 2, Intensity.HIGH, mensalista=True),
-    Player("Guilherme Figueiredo", 5, Intensity.HIGH, mensalista=True),
+    Player("Daniel", 2, Intensity.HIGH, mensalista=True),
+    Player("Down", 3, Intensity.LOW, mensalista=True),
+    Player("Gabriel de Leon", 1, Intensity.HIGH, mensalista=True),
+    Player("Guilherme Figueiredo", 6, Intensity.HIGH, mensalista=True),
     Player("Guila", 4, Intensity.LOW, mensalista=True),
     Player("Hugo", 4, Intensity.HIGH, mensalista=True),
     Player("Falcǜo", 4, Intensity.HIGH, mensalista=True),
@@ -78,9 +78,9 @@ real_players = [
     Player("Monteiro", 7, Intensity.HIGH, mensalista=False),
     Player("Jonas", 4, Intensity.LOW, mensalista=False),
     Player("PAJ�%", 6, Intensity.HIGH, mensalista=False),
-    Player("Gustavo", 4, Intensity.LOW, mensalista=True),
-    Player("Sabugo", 2, Intensity.LOW, mensalista=False),
-    Player("Junior", 4, Intensity.LOW, mensalista=False),
+    Player("Gustavo", 5, Intensity.LOW, mensalista=True),
+    Player("Sabugo", 2, Intensity.LOW, mensalista=True),
+    Player("Junior", 5, Intensity.LOW, mensalista=False),
     Player("Marcelo Torres", 5, Intensity.LOW, mensalista=False),
     Player("Eduardo Jorge", 4, Intensity.LOW, mensalista=False),
     Player("Vareta", 2, Intensity.LOW, mensalista=False)
@@ -170,7 +170,7 @@ class TeamBalancer:
         self.players = players
         self.num_teams = num_teams
         self.players_per_team = len(players) // num_teams
-        self.max_attempts = 100000
+        self.max_attempts = 50000
 
     def calculate_team_strength(self, team: List[Player]) -> float:
         if not team:
