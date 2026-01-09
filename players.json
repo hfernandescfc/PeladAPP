@@ -217,7 +217,7 @@
   },
   {
     "name": "Junior",
-    "rating": 4,
+    "rating": 5,
     "intensity": "LOW",
     "mensalista": false
   },
@@ -237,6 +237,12 @@
     "name": "Vareta",
     "rating": 2,
     "intensity": "LOW",
+    "mensalista": false
+  },
+  {
+    "name": "Pedro Alonso",
+    "rating": 3,
+    "intensity": "HIGH",
     "mensalista": false
   }
 ]
