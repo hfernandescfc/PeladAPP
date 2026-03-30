@@ -111,6 +111,7 @@ def index():
 def balance():
     selected_players = []
     num_teams = int(request.form.get('num_teams', 4))
+    shuffle_count = max(1, int(request.form.get('shuffle_count', 1) or 1))
 
     with players_lock:
         selected_players = [p for p in real_players if request.form.get(f'player_{p.name}')]
@@ -122,9 +123,10 @@ def balance():
     with job_lock:
         job_store[job_id] = {'status': 'queued', 'error': None, 'ctx': None}
 
-    def worker(players_snapshot, teams_count, j_id):
+    def worker(players_snapshot, teams_count, j_id, count):
         try:
             ctx = _build_balance_context(players_snapshot, teams_count)
+            ctx['shuffle_count'] = count
             with job_lock:
                 job_store[j_id]['status'] = 'done'
                 job_store[j_id]['ctx'] = ctx
@@ -133,7 +135,7 @@ def balance():
                 job_store[j_id]['status'] = 'error'
                 job_store[j_id]['error'] = str(exc)
 
-    threading.Thread(target=worker, args=(list(selected_players), num_teams, job_id), daemon=True).start()
+    threading.Thread(target=worker, args=(list(selected_players), num_teams, job_id, shuffle_count), daemon=True).start()
 
     return render_template('processing.html', job_id=job_id)
 

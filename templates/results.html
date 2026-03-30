@@ -177,9 +177,42 @@
             background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
             color: #0b1220;
         }
-        .team-black { 
+        .team-black {
             background: linear-gradient(135deg, #0b1220, #111827);
             color: #e2e8f0;
+        }
+        .shuffle-banner {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            background: var(--panel);
+            border: 1px solid var(--stroke);
+            border-radius: 12px;
+            padding: 12px 18px;
+            margin-top: 16px;
+            box-shadow: var(--shadow);
+        }
+        .shuffle-count-badge {
+            font-size: 2rem;
+            font-weight: 800;
+            color: #f97316;
+            line-height: 1;
+            min-width: 2.5ch;
+            text-align: center;
+        }
+        .shuffle-count-badge.first {
+            color: #10b981;
+        }
+        .shuffle-banner-text {
+            line-height: 1.4;
+        }
+        .shuffle-banner-text strong {
+            display: block;
+            font-size: 0.95rem;
+        }
+        .shuffle-banner-text span {
+            font-size: 0.82rem;
+            color: var(--muted);
         }
     </style>
 </head>
@@ -188,6 +221,20 @@
         <img src="{{ url_for('static', filename='logo.jpeg') }}" alt="Logo">
         <h1>Times Balanceados</h1>
         <div class="version-badge">v3.2</div>
+    </div>
+
+    <div class="shuffle-banner">
+        <div class="shuffle-count-badge {% if shuffle_count == 1 %}first{% endif %}">#{{ shuffle_count }}</div>
+        <div class="shuffle-banner-text">
+            <strong>{{ "Primeiro sorteio" if shuffle_count == 1 else "Sorteio nº " ~ shuffle_count }}</strong>
+            <span>
+                {%- if shuffle_count == 1 -%}
+                    Este é o resultado do primeiro sorteio realizado com esta seleção.
+                {%- else -%}
+                    Este resultado foi obtido após {{ shuffle_count }} sorteios com esta mesma seleção de jogadores.
+                {%- endif -%}
+            </span>
+        </div>
     </div>
 
     <div class="sub-header" style="margin-top: 20px;">
@@ -291,6 +338,7 @@
             {% endfor %}
         {% endfor %}
         <input type="number" name="num_teams" value="{{ num_teams }}">
+        <input type="hidden" name="shuffle_count" value="{{ shuffle_count + 1 }}">
     </form>
 
     <script>
