@@ -3,11 +3,11 @@
     "name": "Ivo",
     "rating": 4,
     "intensity": "HIGH",
-    "mensalista": true
+    "mensalista": false
   },
   {
     "name": "Vaca",
-    "rating": 3,
+    "rating": 2,
     "intensity": "LOW",
     "mensalista": true
   },
@@ -25,7 +25,7 @@
   },
   {
     "name": "Daniel",
-    "rating": 2,
+    "rating": 3,
     "intensity": "LOW",
     "mensalista": true
   },
@@ -55,9 +55,9 @@
   },
   {
     "name": "Hugo",
-    "rating": 4,
+    "rating": 5,
     "intensity": "HIGH",
-    "mensalista": true
+    "mensalista": false
   },
   {
     "name": "Falcão",
@@ -99,13 +99,13 @@
     "name": "Arthur Melo",
     "rating": 2,
     "intensity": "LOW",
-    "mensalista": true
+    "mensalista": false
   },
   {
     "name": "Sammy",
     "rating": 3,
     "intensity": "HIGH",
-    "mensalista": false
+    "mensalista": true
   },
   {
     "name": "Serginho",
@@ -175,7 +175,7 @@
   },
   {
     "name": "Gabriel Lira",
-    "rating": 4,
+    "rating": 5,
     "intensity": "HIGH",
     "mensalista": false
   },
@@ -205,7 +205,7 @@
   },
   {
     "name": "Gustavo",
-    "rating": 5,
+    "rating": 4,
     "intensity": "LOW",
     "mensalista": true
   },
@@ -223,7 +223,7 @@
   },
   {
     "name": "Marcelo Torres",
-    "rating": 5,
+    "rating": 4,
     "intensity": "LOW",
     "mensalista": false
   },
@@ -237,12 +237,66 @@
     "name": "Vareta",
     "rating": 2,
     "intensity": "LOW",
-    "mensalista": false
+    "mensalista": true
   },
   {
     "name": "Pedro Alonso",
     "rating": 3,
     "intensity": "HIGH",
+    "mensalista": false
+  },
+  {
+    "name": "Thiago cruz",
+    "rating": 1,
+    "intensity": "LOW",
+    "mensalista": false
+  },
+  {
+    "name": "David Marques",
+    "rating": 2,
+    "intensity": "LOW",
+    "mensalista": false
+  },
+  {
+    "name": "PS",
+    "rating": 6,
+    "intensity": "HIGH",
+    "mensalista": false
+  },
+  {
+    "name": "Felipe Fragoso",
+    "rating": 5,
+    "intensity": "HIGH",
+    "mensalista": false
+  },
+  {
+    "name": "Doca",
+    "rating": 4,
+    "intensity": "HIGH",
+    "mensalista": false
+  },
+  {
+    "name": "Dudu",
+    "rating": 6,
+    "intensity": "HIGH",
+    "mensalista": false
+  },
+  {
+    "name": "Claudio",
+    "rating": 6,
+    "intensity": "HIGH",
+    "mensalista": false
+  },
+  {
+    "name": "Porpino",
+    "rating": 3,
+    "intensity": "LOW",
+    "mensalista": false
+  },
+  {
+    "name": "Guilherme Calafa",
+    "rating": 4,
+    "intensity": "LOW",
     "mensalista": false
   }
 ]

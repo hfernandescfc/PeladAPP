@@ -1,8 +1,9 @@
-from typing import List, Dict, Tuple
+from typing import List, Dict
 import random
 import json
 import os
 import logging
+import threading
 from dataclasses import dataclass
 from enum import Enum
 
@@ -164,12 +165,16 @@ def load_or_init_players() -> None:
 # Carrega ou inicializa ao importar o módulo
 load_or_init_players()
 
+# Lock para proteger acessos concorrentes à lista de jogadores
+players_lock = threading.Lock()
+
 
 class TeamBalancer:
     def __init__(self, players: List[Player], num_teams: int = 4):
         self.players = players
         self.num_teams = num_teams
         self.players_per_team = len(players) // num_teams
+        self.extra = len(players) % num_teams  # times que recebem um jogador a mais
         self.max_attempts = 50000
 
     def calculate_team_strength(self, team: List[Player]) -> float:
@@ -180,15 +185,35 @@ class TeamBalancer:
     def count_high_intensity(self, team: List[Player]) -> int:
         return sum(1 for p in team if p.intensity == Intensity.HIGH)
 
+    def _top_players(self) -> List[Player]:
+        if not self.players or self.num_teams <= 0:
+            return []
+        sorted_players = sorted(
+            self.players,
+            key=lambda p: (-p.overall_rating, p.name),
+        )
+        return sorted_players[: min(self.num_teams, len(sorted_players))]
+
     def is_valid_distribution(self, teams: List[List[Player]]) -> bool:
-        # Verifica se todos os times têm o número correto de jogadores
-        if not all(len(team) == self.players_per_team for team in teams):
+        # Verifica tamanhos: times com players_per_team ou players_per_team+1 (quando há resto)
+        for team in teams:
+            if len(team) < self.players_per_team or len(team) > self.players_per_team + 1:
+                return False
+        # Garante que todos os jogadores foram distribuídos
+        if sum(len(t) for t in teams) != len(self.players):
             return False
 
-        # Verifica o balanceamento de jogadores de alta intensidade
-        total_high_intensity = sum(self.count_high_intensity(team) for team in teams)
-        expected_high_intensity_per_team = total_high_intensity / self.num_teams
+        # Garante que os jogadores de maior nivel estejam em times distintos
+        top_players = self._top_players()
+        if top_players:
+            top_names = {p.name for p in top_players}
+            top_counts = [sum(1 for p in team if p.name in top_names) for team in teams]
+            if max(top_counts) > 1:
+                return False
+            if sum(top_counts) != len(top_names):
+                return False
 
+        # Verifica o balanceamento de jogadores de alta intensidade
         # Verifica se a distribuição de jogadores de alta intensidade está equilibrada
         high_intensity_counts = [self.count_high_intensity(team) for team in teams]
         max_high_intensity_diff = max(high_intensity_counts) - min(high_intensity_counts)
@@ -205,9 +230,12 @@ class TeamBalancer:
     def distribute_players(self) -> List[List[Player]]:
         best_distribution = None
         best_strength_diff = float('inf')
+        mean_strength = sum(p.overall_rating for p in self.players) / len(self.players) if self.players else 4.0
 
-        for attempt in range(self.max_attempts):
-            available_players = self.players.copy()
+        for _ in range(self.max_attempts):
+            top_players = self._top_players()
+            top_names = {p.name for p in top_players}
+            available_players = [p for p in self.players if p.name not in top_names]
 
             # Separa jogadores por intensidade
             high_intensity_players = [p for p in available_players if p.intensity == Intensity.HIGH]
@@ -215,6 +243,11 @@ class TeamBalancer:
 
             # Inicializa times vazios
             teams = [[] for _ in range(self.num_teams)]
+
+            # Distribui os jogadores de maior nivel para times distintos
+            random.shuffle(top_players)
+            for i, player in enumerate(top_players):
+                teams[i % self.num_teams].append(player)
 
             # Distribui jogadores de alta intensidade igualmente entre os times
             random.shuffle(high_intensity_players)
@@ -246,17 +279,17 @@ class TeamBalancer:
             remaining_players = medium_players + weak_players
             random.shuffle(remaining_players)
 
-            # Completa os times
+            # Completa os times — distribui todos, incluindo o resto da divisão
             while remaining_players:
                 for team in teams:
-                    if len(team) < self.players_per_team and remaining_players:
+                    if len(team) < self.players_per_team + 1 and remaining_players:
                         candidate_count = min(3, len(remaining_players))
                         candidates = remaining_players[:candidate_count]
 
                         if candidates:
                             best_candidate = min(
                                 candidates,
-                                key=lambda p: abs(self.calculate_team_strength(team + [p]) - 4.0),
+                                key=lambda p: abs(self.calculate_team_strength(team + [p]) - mean_strength),
                             )
                             team.append(best_candidate)
                             remaining_players.remove(best_candidate)
@@ -281,50 +314,6 @@ class TeamBalancer:
         final_distribution = best_distribution[:]
         random.shuffle(final_distribution)
         return final_distribution
-
-    def distribute_players_dissimilar_strength(self) -> List[List[Player]]:
-        # Objetivo: maximizar a diferença de força entre o time mais forte e o mais fraco
-        if self.players_per_team == 0:
-            return [[] for _ in range(self.num_teams)]
-
-        sorted_players = sorted(self.players, key=lambda p: p.overall_rating, reverse=True)
-        teams: List[List[Player]] = [[] for _ in range(self.num_teams)]
-
-        # Preenche cada time em blocos ordenados para criar disparidade
-        idx = 0
-        for t in range(self.num_teams):
-            while len(teams[t]) < self.players_per_team and idx < len(sorted_players):
-                teams[t].append(sorted_players[idx])
-                idx += 1
-
-        return teams
-
-    def distribute_players_dissimilar_intensity(self) -> List[List[Player]]:
-        # Objetivo: concentrar alta intensidade nos primeiros times para maximizar diferença
-        if self.players_per_team == 0:
-            return [[] for _ in range(self.num_teams)]
-
-        high = [p for p in self.players if p.intensity == Intensity.HIGH]
-        low = [p for p in self.players if p.intensity == Intensity.LOW]
-
-        # Ordena por força para consistência determinística
-        high.sort(key=lambda p: p.overall_rating, reverse=True)
-        low.sort(key=lambda p: p.overall_rating, reverse=True)
-
-        teams: List[List[Player]] = [[] for _ in range(self.num_teams)]
-
-        # Primeiro, enche os primeiros times com HIGH até onde der
-        for t in range(self.num_teams):
-            while len(teams[t]) < self.players_per_team and high:
-                teams[t].append(high.pop(0))
-
-        # Depois completa restantes com LOW
-        for t in range(self.num_teams):
-            while len(teams[t]) < self.players_per_team and low:
-                teams[t].append(low.pop(0))
-
-        # Se ainda sobrar alguém (por arredondamento), ignora para manter tamanhos iguais
-        return teams
 
     def print_teams(self, teams: List[List[Player]]) -> None:
         print("\nTimes Balanceados:")

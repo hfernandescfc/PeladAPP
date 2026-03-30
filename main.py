@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, jsonify
-from team_balancer import TeamBalancer, Player, real_players, Intensity, save_players
+from team_balancer import TeamBalancer, Player, real_players, Intensity, save_players, players_lock
 import os
 import uuid
 import threading
@@ -33,8 +33,8 @@ def _build_balance_context(selected_players, num_teams):
     candidates = []
     seen = set()
     state = random.getstate()
+    seed_base = random.SystemRandom().randint(0, 2**31 - 1)
     try:
-        seed_base = 12345
         for k in range(30):
             random.seed(seed_base + 97 * k)
             dist = balancer.distribute_players()
@@ -112,9 +112,8 @@ def balance():
     selected_players = []
     num_teams = int(request.form.get('num_teams', 4))
 
-    for player in real_players:
-        if request.form.get(f'player_{player.name}'):
-            selected_players.append(player)
+    with players_lock:
+        selected_players = [p for p in real_players if request.form.get(f'player_{p.name}')]
 
     if len(selected_players) < num_teams:
         return "Erro: Selecione pelo menos um jogador por time", 400
@@ -156,7 +155,7 @@ def balance_result(job_id):
             return "Tarefa não encontrada", 404
         if job['status'] != 'done':
             return "Tarefa ainda não concluída", 202
-        ctx = job['ctx']
+        ctx = job_store.pop(job_id)['ctx']
     return render_template('results.html', **ctx)
 
 
@@ -180,8 +179,9 @@ def add_players():
             new_player = Player(name, overall_rating, intensity, mensalista)
             new_players.append(new_player)
 
-        real_players.extend(new_players)
-        save_players(real_players)
+        with players_lock:
+            real_players.extend(new_players)
+            save_players(real_players)
 
         return jsonify({'message': 'Jogadores adicionados com sucesso'}), 200
     except Exception as e:
@@ -201,24 +201,25 @@ def update_player():
         intensity_key = data.get('intensity')
         mensalista = bool(data.get('mensalista', False))
 
-        target = next((p for p in real_players if p.name == old_name), None)
-        if not target:
-            return jsonify({'error': 'Jogador não encontrado'}), 404
+        with players_lock:
+            target = next((p for p in real_players if p.name == old_name), None)
+            if not target:
+                return jsonify({'error': 'Jogador não encontrado'}), 404
 
-        if name:
-            target.name = name
-        if rating is not None:
-            try:
-                r = int(rating)
-            except (ValueError, TypeError):
-                return jsonify({'error': 'Avaliação inválida, use inteiro de 1 a 7'}), 400
-            if r < 1 or r > 7:
-                return jsonify({'error': 'Avaliação deve ser entre 1 e 7'}), 400
-            target.overall_rating = r
-        if intensity_key:
-            target.intensity = Intensity[intensity_key.upper()]
-        target.mensalista = mensalista
-        save_players(real_players)
+            if name:
+                target.name = name
+            if rating is not None:
+                try:
+                    r = int(rating)
+                except (ValueError, TypeError):
+                    return jsonify({'error': 'Avaliação inválida, use inteiro de 1 a 7'}), 400
+                if r < 1 or r > 7:
+                    return jsonify({'error': 'Avaliação deve ser entre 1 e 7'}), 400
+                target.overall_rating = r
+            if intensity_key:
+                target.intensity = Intensity[intensity_key.upper()]
+            target.mensalista = mensalista
+            save_players(real_players)
 
         return jsonify({'message': 'Jogador atualizado com sucesso'}), 200
     except Exception as e:
@@ -233,12 +234,13 @@ def delete_player():
             return jsonify({'error': 'Nome do jogador é obrigatório'}), 400
 
         name = data['name']
-        idx = next((i for i, p in enumerate(real_players) if p.name == name), None)
-        if idx is None:
-            return jsonify({'error': 'Jogador não encontrado'}), 404
+        with players_lock:
+            idx = next((i for i, p in enumerate(real_players) if p.name == name), None)
+            if idx is None:
+                return jsonify({'error': 'Jogador não encontrado'}), 404
 
-        real_players.pop(idx)
-        save_players(real_players)
+            real_players.pop(idx)
+            save_players(real_players)
         return jsonify({'message': 'Jogador removido com sucesso'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 400

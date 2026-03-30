@@ -18,6 +18,8 @@
             --danger: #ef4444;
             --shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
             --radius: 12px;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.08);
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -604,18 +606,56 @@
         const listDiv = document.getElementById('selectedList');
         const selected = getPlayerCheckboxes().filter(cb => cb.checked).map(cb => cb.dataset.name);
         
-        if (selected.length === 0) listDiv.innerHTML = '<p style="color:var(--text-muted); text-align:center;">Ninguém selecionado.</p>';
-        else listDiv.innerHTML = '<ul style="padding-left:20px;">' + selected.map(n => `<li>${n}</li>`).join('') + '</ul>';
+        listDiv.innerHTML = '';
+        if (selected.length === 0) {
+            const p = document.createElement('p');
+            p.style.cssText = 'color:var(--text-muted); text-align:center;';
+            p.textContent = 'Ninguém selecionado.';
+            listDiv.appendChild(p);
+        } else {
+            const ul = document.createElement('ul');
+            ul.style.paddingLeft = '20px';
+            selected.forEach(n => { const li = document.createElement('li'); li.textContent = n; ul.appendChild(li); });
+            listDiv.appendChild(ul);
+        }
         
         openModal(selectedModal);
     }
     
-    // Import Function (simplificada)
-    function importPlayers() {
-        const text = document.getElementById('playerImport').value;
-        if(!text) return;
-        // ... sua lógica de parse aqui ...
-        alert('Lógica de importação deve ser implementada ou copiada do seu script original.');
+    async function importPlayers() {
+        const text = document.getElementById('playerImport').value.trim();
+        if (!text) return;
+
+        const players = [];
+        const errors = [];
+
+        text.split('\n').forEach((line, i) => {
+            const parts = line.split(',').map(s => s.trim());
+            if (parts.length < 3) { errors.push(`Linha ${i + 1}: formato inválido (esperado: Nome, Intensidade, Nota)`); return; }
+            const [name, intensity, ratingStr] = parts;
+            const rating = parseInt(ratingStr, 10);
+            const intensityUpper = intensity.toUpperCase();
+            if (!name) { errors.push(`Linha ${i + 1}: nome vazio`); return; }
+            if (isNaN(rating) || rating < 1 || rating > 7) { errors.push(`Linha ${i + 1}: nota inválida (use 1–7)`); return; }
+            if (intensityUpper !== 'HIGH' && intensityUpper !== 'LOW') { errors.push(`Linha ${i + 1}: intensidade deve ser HIGH ou LOW`); return; }
+            players.push({ name, rating, intensity: intensityUpper, mensalista: false });
+        });
+
+        if (errors.length) { alert('Erros encontrados:\n' + errors.join('\n')); return; }
+        if (!players.length) return;
+
+        try {
+            const res = await fetch('{{ url_for("add_players") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ players })
+            });
+            if (res.ok) location.reload();
+            else {
+                const data = await res.json();
+                alert('Erro: ' + (data.error || 'Falha ao importar'));
+            }
+        } catch (e) { alert('Erro de conexão'); }
     }
 
 </script>
