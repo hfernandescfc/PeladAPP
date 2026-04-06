@@ -348,7 +348,7 @@
         </div>
 
         <div class="player-grid">
-            {% for player in players %}
+            {% for player in players|sort(attribute='name')|sort(attribute='mensalista', reverse=true) %}
             <label class="player-card" for="player_{{ player.name }}">
                 <div class="player-header">
                     <div style="display: flex; align-items: center;">

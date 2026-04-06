@@ -176,6 +176,7 @@ class TeamBalancer:
         self.players_per_team = len(players) // num_teams
         self.extra = len(players) % num_teams  # times que recebem um jogador a mais
         self.max_attempts = 50000
+        self._strength_tolerance = 1.0
 
     def calculate_team_strength(self, team: List[Player]) -> float:
         if not team:
@@ -225,85 +226,105 @@ class TeamBalancer:
         # Verifica o balanceamento de força
         team_strengths = [self.calculate_team_strength(team) for team in teams]
         max_strength_diff = max(team_strengths) - min(team_strengths)
-        return max_strength_diff <= 1
+        return max_strength_diff <= self._strength_tolerance
 
     def distribute_players(self) -> List[List[Player]]:
-        best_distribution = None
-        best_strength_diff = float('inf')
         mean_strength = sum(p.overall_rating for p in self.players) / len(self.players) if self.players else 4.0
 
-        for _ in range(self.max_attempts):
-            top_players = self._top_players()
-            top_names = {p.name for p in top_players}
-            available_players = [p for p in self.players if p.name not in top_names]
+        # Tamanho-alvo por time: os primeiros `extra` times recebem um jogador a mais
+        team_target_sizes = [
+            self.players_per_team + (1 if i < self.extra else 0)
+            for i in range(self.num_teams)
+        ]
 
-            # Separa jogadores por intensidade
-            high_intensity_players = [p for p in available_players if p.intensity == Intensity.HIGH]
-            low_intensity_players = [p for p in available_players if p.intensity == Intensity.LOW]
+        best_distribution = None
+        best_strength_diff = float('inf')
 
-            # Inicializa times vazios
-            teams = [[] for _ in range(self.num_teams)]
+        # Correção 3: tolerância adaptativa — relaxa gradualmente se não achar solução
+        for tolerance in [1.0, 1.5, 2.0]:
+            self._strength_tolerance = tolerance
 
-            # Distribui os jogadores de maior nivel para times distintos
-            random.shuffle(top_players)
-            for i, player in enumerate(top_players):
-                teams[i % self.num_teams].append(player)
+            for _ in range(self.max_attempts):
+                top_players = self._top_players()
+                top_names = {p.name for p in top_players}
+                available_players = [p for p in self.players if p.name not in top_names]
 
-            # Distribui jogadores de alta intensidade igualmente entre os times
-            random.shuffle(high_intensity_players)
-            high_intensity_per_team = len(high_intensity_players) // self.num_teams
+                # Separa jogadores por intensidade
+                high_intensity_players = [p for p in available_players if p.intensity == Intensity.HIGH]
+                low_intensity_players = [p for p in available_players if p.intensity == Intensity.LOW]
 
-            for i, team in enumerate(teams):
-                for _ in range(high_intensity_per_team):
-                    if high_intensity_players:
-                        team.append(high_intensity_players.pop())
+                # Inicializa times vazios
+                teams = [[] for _ in range(self.num_teams)]
 
-            # Distribui os jogadores de alta intensidade restantes (se houver)
-            for i, player in enumerate(high_intensity_players):
-                teams[i % self.num_teams].append(player)
+                # Distribui os jogadores de maior nivel para times distintos
+                random.shuffle(top_players)
+                for i, player in enumerate(top_players):
+                    teams[i % self.num_teams].append(player)
 
-            # Agrupa jogadores restantes (baixa intensidade) por nível
-            elite_players = [p for p in low_intensity_players if p.overall_rating >= 6]
-            medium_players = [p for p in low_intensity_players if 3 <= p.overall_rating < 6]
-            weak_players = [p for p in low_intensity_players if p.overall_rating < 3]
+                # Correção 2: conta alta intensidade que já veio dos top players por time
+                high_already = [self.count_high_intensity(t) for t in teams]
 
-            random.shuffle(elite_players)
-            random.shuffle(medium_players)
-            random.shuffle(weak_players)
+                # Distribui jogadores de alta intensidade igualmente entre os times,
+                # compensando o que cada time já recebeu via top players
+                random.shuffle(high_intensity_players)
+                total_high = len(high_intensity_players) + sum(high_already)
+                target_high_per_team = total_high // self.num_teams
 
-            # Distribui jogadores elite restantes
-            for i, player in enumerate(elite_players):
-                teams[i % self.num_teams].append(player)
+                for i, team in enumerate(teams):
+                    needed = max(0, target_high_per_team - high_already[i])
+                    for _ in range(needed):
+                        if high_intensity_players:
+                            team.append(high_intensity_players.pop())
 
-            # Junta médios e fracos
-            remaining_players = medium_players + weak_players
-            random.shuffle(remaining_players)
+                # Distribui os jogadores de alta intensidade restantes (se houver)
+                for i, player in enumerate(high_intensity_players):
+                    teams[i % self.num_teams].append(player)
 
-            # Completa os times — distribui todos, incluindo o resto da divisão
-            while remaining_players:
-                for team in teams:
-                    if len(team) < self.players_per_team + 1 and remaining_players:
-                        candidate_count = min(3, len(remaining_players))
-                        candidates = remaining_players[:candidate_count]
+                # Agrupa jogadores restantes (baixa intensidade) por nível
+                elite_players = [p for p in low_intensity_players if p.overall_rating >= 6]
+                medium_players = [p for p in low_intensity_players if 3 <= p.overall_rating < 6]
+                weak_players = [p for p in low_intensity_players if p.overall_rating < 3]
 
-                        if candidates:
-                            best_candidate = min(
-                                candidates,
-                                key=lambda p: abs(self.calculate_team_strength(team + [p]) - mean_strength),
-                            )
-                            team.append(best_candidate)
-                            remaining_players.remove(best_candidate)
+                random.shuffle(elite_players)
+                random.shuffle(medium_players)
+                random.shuffle(weak_players)
 
-            if self.is_valid_distribution(teams):
-                team_strengths = [self.calculate_team_strength(team) for team in teams]
-                strength_diff = max(team_strengths) - min(team_strengths)
+                # Distribui jogadores elite restantes
+                for i, player in enumerate(elite_players):
+                    teams[i % self.num_teams].append(player)
 
-                if strength_diff < best_strength_diff:
-                    best_strength_diff = strength_diff
-                    best_distribution = [team.copy() for team in teams]
+                # Junta médios e fracos
+                remaining_players = medium_players + weak_players
+                random.shuffle(remaining_players)
 
-                if strength_diff <= 0.3:
-                    break
+                # Correção 1: respeita o tamanho-alvo individual de cada time
+                while remaining_players:
+                    for i, team in enumerate(teams):
+                        if len(team) < team_target_sizes[i] and remaining_players:
+                            candidate_count = min(3, len(remaining_players))
+                            candidates = remaining_players[:candidate_count]
+
+                            if candidates:
+                                best_candidate = min(
+                                    candidates,
+                                    key=lambda p: abs(self.calculate_team_strength(team + [p]) - mean_strength),
+                                )
+                                team.append(best_candidate)
+                                remaining_players.remove(best_candidate)
+
+                if self.is_valid_distribution(teams):
+                    team_strengths = [self.calculate_team_strength(team) for team in teams]
+                    strength_diff = max(team_strengths) - min(team_strengths)
+
+                    if strength_diff < best_strength_diff:
+                        best_strength_diff = strength_diff
+                        best_distribution = [team.copy() for team in teams]
+
+                    if strength_diff <= 0.3:
+                        break
+
+            if best_distribution is not None:
+                break
 
         if best_distribution is None:
             raise ValueError(
